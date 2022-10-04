@@ -1,0 +1,8 @@
+{
+  "name": "io.devdog.devdog-general",
+  "version": "1.0.0",
+  "displayName": "Devdog General",
+  "description": "General library for Devdog Packages",
+  "documentationUrl": "https://github.com/devdogio/general",
+  "type": "library"
+}

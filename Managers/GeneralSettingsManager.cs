@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.Assertions;
+﻿using UnityEngine.Assertions;
 
 namespace Devdog.General
 {
@@ -9,7 +6,6 @@ namespace Devdog.General
     {
         [Required]
         public GeneralSettings settings;
-
 
         protected override void Awake()
         {
