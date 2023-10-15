@@ -1,14 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using UnityEditor;
+﻿using UnityEditor;
 
 namespace Devdog.General.Editors.GameRules
 {
     public class GameRuleIssue
     {
+        public GameRuleAction[] actions;
         public string message;
         public MessageType messageType;
-        public GameRuleAction[] actions;
 
         public GameRuleIssue(string message, MessageType messageType, params GameRuleAction[] actions)
         {

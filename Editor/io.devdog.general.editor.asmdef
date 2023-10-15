@@ -1,0 +1,18 @@
+{
+    "name": "io.devdog.general.editor",
+    "rootNamespace": "DevDog.General.Editors",
+    "references": [
+        "GUID:8917212f15cc4599a21656eb7158695b"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

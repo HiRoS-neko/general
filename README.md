@@ -1,1 +1,1 @@
-# general
+# DevDog General Package

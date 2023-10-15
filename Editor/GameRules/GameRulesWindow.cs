@@ -8,17 +8,95 @@ namespace Devdog.General.Editors.GameRules
 {
     public class GameRulesWindow : BetterEditorWindow
     {
-        internal static event Action<List<IGameRule>> OnIssuesUpdated;
-
-        protected static List<IGameRule> allRules = new List<IGameRule>(); 
-        protected static List<IGameRule> activeRules = new List<IGameRule>();
+        protected static List<IGameRule> allRules = new();
+        protected static List<IGameRule> activeRules = new();
         protected static Vector2 scrollPos;
         protected static GameRulesWindow window;
-        protected static bool showRules = false;
+        protected static bool showRules;
 
-        protected static bool needsUpdate = false;
-        private static Type[] _allGameRuleTypes = new Type[0];
-        private static IGameRule[] _rules = new IGameRule[0];
+        protected static bool needsUpdate;
+        private static Type[] _allGameRuleTypes = Type.EmptyTypes;
+        private static IGameRule[] _rules = Array.Empty<IGameRule>();
+
+        public override void OnGUI()
+        {
+            base.OnGUI();
+
+            scrollPos = GUILayout.BeginScrollView(scrollPos);
+
+            DrawHeaderToolbar();
+
+            if (showRules)
+            {
+                EditorGUILayout.BeginVertical(EditorStyles.boxStyle);
+
+                foreach (var rule in allRules)
+                {
+                    if (rule.ignore) GUI.color = Color.grey;
+
+                    EditorGUI.BeginChangeCheck();
+                    var result = EditorGUILayout.ToggleLeft(rule.saveName, !rule.ignore);
+                    if (EditorGUI.EndChangeCheck()) rule.ignore = !result;
+
+                    GUI.color = Color.white;
+                }
+
+                EditorGUILayout.EndVertical();
+            }
+
+            if (needsUpdate)
+            {
+                EditorGUILayout.HelpBox("Not scanned. Hit Force rescan", MessageType.Warning);
+            }
+            else
+            {
+                if (activeRules.Sum(o => o.ignore == false && o.issues.Count != 0 ? 1 : 0) == 0)
+                    EditorGUILayout.HelpBox("No problems found...", MessageType.Info);
+            }
+
+            foreach (var rule in activeRules)
+            {
+                var issues = rule.issues;
+                for (var i = issues.Count - 1; i >= 0; i--)
+                {
+                    var issue = issues[i];
+                    EditorGUILayout.HelpBox(issue.message, issue.messageType);
+
+                    GUILayout.BeginHorizontal("Toolbar");
+                    foreach (var action in issue.actions)
+                    {
+                        if (action.name.ToLower().Contains("fix")) GUI.color = Color.green;
+
+                        if (GUILayout.Button(action.name, "toolbarbutton"))
+                        {
+                            action.action();
+
+                            if (action.name.ToLower().Contains("fix")) issues.RemoveAt(i);
+                        }
+
+                        GUI.color = Color.white;
+                    }
+
+                    if (issue.messageType < MessageType.Error)
+                    {
+                        GUI.color = Color.yellow;
+                        if (GUILayout.Button("Ignore", "toolbarbutton"))
+                        {
+                            rule.ignore = true;
+                            issues.RemoveAt(i);
+                        }
+
+                        GUI.color = Color.white;
+                    }
+
+                    GUILayout.EndHorizontal();
+                }
+            }
+
+            GUILayout.EndScrollView();
+        }
+
+        internal static event Action<List<IGameRule>> OnIssuesUpdated;
 
         [MenuItem("Tools/Devdog/Setup wizard", false, 2)] // Always at bottom
         public static void ShowWindow()
@@ -40,25 +118,17 @@ namespace Devdog.General.Editors.GameRules
 
         public static IGameRule[] GetAllRules()
         {
-            if (_rules != null && _rules.Length > 0)
-            {
-                return _rules;
-            }
+            if (_rules != null && _rules.Length > 0) return _rules;
 
-            _allGameRuleTypes = ReflectionUtility.GetAllTypesThatImplement(typeof (IGameRule), true);
+            _allGameRuleTypes = ReflectionUtility.GetAllTypesThatImplement(typeof(IGameRule), true);
             var rules = new List<IGameRule>(_allGameRuleTypes.Length);
-            foreach (var type in _allGameRuleTypes)
-            {
-                rules.Add((IGameRule)Activator.CreateInstance(type));
-            }
+            foreach (var type in _allGameRuleTypes) rules.Add((IGameRule)Activator.CreateInstance(type));
 
-            for (int i = rules.Count - 1; i >= 0; i--)
+            for (var i = rules.Count - 1; i >= 0; i--)
             {
-                var hideAttribute = (HidesGameRuleAttribute)rules[i].GetType().GetCustomAttributes(typeof(HidesGameRuleAttribute), true).FirstOrDefault();
-                if (hideAttribute != null)
-                {
-                    rules.RemoveAll(o => o.GetType() == hideAttribute.type);
-                }
+                var hideAttribute = (HidesGameRuleAttribute)rules[i].GetType()
+                    .GetCustomAttributes(typeof(HidesGameRuleAttribute), true).FirstOrDefault();
+                if (hideAttribute != null) rules.RemoveAll(o => o.GetType() == hideAttribute.type);
             }
 
             _rules = rules.ToArray();
@@ -76,12 +146,8 @@ namespace Devdog.General.Editors.GameRules
             allRules.Clear();
             allRules.AddRange(GetAllRules());
             foreach (var rule in allRules)
-            {
                 if (rule.issues != null)
-                {
                     rule.issues.Clear();
-                }
-            }
 
             activeRules.Clear();
             activeRules.AddRange(GetAllActiveRules());
@@ -93,126 +159,30 @@ namespace Devdog.General.Editors.GameRules
 
             UpdateRules();
 
-            for (int i = 0; i < activeRules.Count; i++)
+            for (var i = 0; i < activeRules.Count; i++)
             {
-                UnityEditor.EditorUtility.DisplayProgressBar("Scanning...", "Searching project for issues...", ((float)(i + 1)) / activeRules.Count);
+                UnityEditor.EditorUtility.DisplayProgressBar("Scanning...", "Searching project for issues...",
+                    (float)(i + 1) / activeRules.Count);
                 try
                 {
                     activeRules[i].UpdateIssue();
                 }
                 catch (Exception e)
                 {
-                    UnityEngine.Debug.LogError(e.Message + "\n" + e.StackTrace);
+                    Debug.LogError(e.Message + "\n" + e.StackTrace);
                 }
             }
 
             UnityEditor.EditorUtility.ClearProgressBar();
 
-            if (OnIssuesUpdated != null)
-            {
-                OnIssuesUpdated(activeRules);
-            }
-        }
-
-        public override void OnGUI()
-        {
-            base.OnGUI();
-
-            scrollPos = GUILayout.BeginScrollView(scrollPos);
-
-            DrawHeaderToolbar();
-
-            if (showRules)
-            {
-                EditorGUILayout.BeginVertical(Devdog.General.Editors.EditorStyles.boxStyle);
-
-                foreach (var rule in allRules)
-                {
-                    if (rule.ignore)
-                    {
-                        GUI.color = Color.grey;
-                    }
-
-                    EditorGUI.BeginChangeCheck();
-                    var result = EditorGUILayout.ToggleLeft(rule.saveName, !rule.ignore);
-                    if (EditorGUI.EndChangeCheck())
-                    {
-                        rule.ignore = !result;
-                    }
-
-                    GUI.color = Color.white;
-                }
-
-                EditorGUILayout.EndVertical();
-            }
-
-            if (needsUpdate)
-            {
-                EditorGUILayout.HelpBox("Not scanned. Hit Force rescan", MessageType.Warning);
-            }
-            else
-            {
-                if (activeRules.Sum(o => o.ignore == false && o.issues.Count != 0 ? 1 : 0) == 0)
-                {
-                    EditorGUILayout.HelpBox("No problems found...", MessageType.Info);
-                }
-            }
-
-            foreach (var rule in activeRules)
-            {
-                var issues = rule.issues;
-                for (int i = issues.Count - 1; i >= 0; i--)
-                {
-                    var issue = issues[i];
-                    EditorGUILayout.HelpBox(issue.message, issue.messageType);
-
-                    GUILayout.BeginHorizontal("Toolbar");
-                    foreach (var action in issue.actions)
-                    {
-                        if (action.name.ToLower().Contains("fix"))
-                        {
-                            GUI.color = Color.green;
-                        }
-
-                        if (GUILayout.Button(action.name, "toolbarbutton"))
-                        {
-                            action.action();
-
-                            if (action.name.ToLower().Contains("fix"))
-                            {
-                                issues.RemoveAt(i);
-                            }
-                        }
-
-                        GUI.color = Color.white;
-                    }
-
-                    if (issue.messageType < MessageType.Error)
-                    {
-                        GUI.color = Color.yellow;
-                        if (GUILayout.Button("Ignore", "toolbarbutton"))
-                        {
-                            rule.ignore = true;
-                            issues.RemoveAt(i);
-                        }
-                        GUI.color = Color.white;
-                    }
-
-                    GUILayout.EndHorizontal();
-                }
-            }
-
-            GUILayout.EndScrollView();
+            if (OnIssuesUpdated != null) OnIssuesUpdated(activeRules);
         }
 
         protected void DrawHeaderToolbar()
         {
             GUILayout.BeginHorizontal("Toolbar");
 
-            if (GUILayout.Button("Show rules", "toolbarbutton"))
-            {
-                showRules = !showRules;
-            }
+            if (GUILayout.Button("Show rules", "toolbarbutton")) showRules = !showRules;
 
             GUI.color = Color.green;
             if (GUILayout.Button("Force rescan", "toolbarbutton"))
@@ -220,10 +190,10 @@ namespace Devdog.General.Editors.GameRules
                 CheckForIssues();
                 Repaint();
             }
+
             GUI.color = Color.white;
 
             GUILayout.EndHorizontal();
         }
-
     }
 }

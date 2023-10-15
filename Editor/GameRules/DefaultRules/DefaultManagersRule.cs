@@ -1,6 +1,4 @@
-﻿using UnityEngine;
-using UnityEditor;
-using Devdog.General.Localization;
+﻿using Devdog.General.Localization;
 
 namespace Devdog.General.Editors.GameRules
 {
